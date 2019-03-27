@@ -1,72 +1,131 @@
 import React from "react";
 
-function dBFSToGain(dbfs) {
-  return Math.pow(10, dbfs / 20);
+const defaultPattern = [
+  {length: .1, gain: .3, rampTime: .1},
+  {length: .1, gain: 1, rampTime: .1},
+];
+
+class Pattern {
+  constructor(values) {
+      this.values = values || [...defaultPattern];
+      this.changeHandler = null;
+      this.index = 0;
+      this.length = 0;
+  }
+
+  registerChangeHandler(changeHandler) {
+    this.changeHandler = changeHandler;
+  }
+
+  changeEvent() {
+    if (!this.changeHandler) return false;
+    this.changeHandler(this.values);
+  }
+
+  get() {
+    return this.values
+  }
+
+  getNext() {
+    if (this.index === 0) this.length = this.values.length;
+    const next = this.values[this.index];
+    console.log(this.index, JSON.stringify(this.values));
+    this.index++;
+    if (this.index >= this.length) this.index = 0;
+    return next;
+  }
+
+  edit(index, changes) {
+    this.values[index] = changes;
+    this.changeEvent();
+  }
+
+  add(changes) {
+    this.values.push(changes || {length: 1, gain: .5, rampTime: .2});
+    this.changeEvent();
+  }
+
+  remove(index) {
+    this.values.splice(index, 1);
+    this.changeEvent();
+  }
+
 }
 
 class Osc {
   context = null;
-  index = 0;
+
   frame = 0;
-  delta = 0;
-  pause = false;
+
+  o = null;
   g = null;
+
+  pause = false;
   nextEffectTime = 0;
-  pattern = [];
+  pattern = new Pattern();
+  isPlaying = false;
 
   registerHandler = (handler) => {
     this.handler = handler;
   };
 
-  changePattern(pattern) {
-    this.pattern = pattern;
-  }
-
   changeGain(value, rampTime) {
-    const t = this.context.currentTime + rampTime;
-    this.g.gain.value = value;
-    // this.g.gain.linearRampToValueAtTime(value, t)
-    // this.g.gain.exponentialRampToValueAtTime(value || 0, t || .03)
+
+    const t = rampTime
+    ? this.context.currentTime + rampTime
+    : this.context.currentTime + .03;
+
+    const v = parseFloat(value) || 0.01;
+
+    // this.g.gain.value = v;
+    // this.g.gain.linearRampToValueAtTime(v, t)
+    this.g.gain.exponentialRampToValueAtTime(v, t);
 
   }
 
   start() {
+    if (!this.pattern.values.length || this.isPlaying) return false;
+    if (!this.context) this.context = new AudioContext();
+    this.isPlaying = true;
+    this.pause = false;
+    this.play();
+    this.scheduler();
+  };
 
+  pauseSequence() {
+    this.pause = true;
+    this.isPlaying = false;
+  }
+
+  scheduler = () => {
     const time = this.frame / 60;
 
     if (this.nextEffectTime < time) {
-      const nextEffect = this.pattern[this.index];
-      // console.log("change:", time - this.nextEffectTime)
-      this.changeGain(nextEffect.gain, nextEffect.rampTime);
-      this.nextEffectTime = time + nextEffect.length;
-      this.index++;
-      if (this.index >= this.pattern.length) this.index = 0;
+      const nextEffect = this.pattern.getNext();
+
+      let gain = parseFloat(nextEffect.gain);
+      let rampTime = parseFloat(nextEffect.rampTime);
+      let length = parseFloat(nextEffect.length);
+
+      gain = (!isNaN(gain) || gain !== 0 ) ? gain : .01;
+      rampTime = (!isNaN(rampTime)) ? rampTime : 0;
+      length = (!isNaN(length)) ? length : 0;
+
+
+      this.changeGain(gain, rampTime);
+      this.nextEffectTime = time + parseFloat(length);
+
     }
 
-    this.handler(this.frame);
     if (!this.pause) {
-      this.frame = requestAnimationFrame(() => this.start())
+      this.frame = requestAnimationFrame(() => this.scheduler())
     }
-  };
-
-  toggleStart() {
-    this.play();
-    // this.pause = !this.pause;
-    // if (!this.pause) {
-    this.start();
-    // }
-  };
-
-  scheduler = () => {
-
 
   };
 
   play() {
-    if (!this.context) this.context = new AudioContext();
     const o = this.context.createOscillator();
     const g = this.context.createGain();
-    console.log(">>", g.gain.maxValue, g.gain.minValue, g.gain.defaultValue);
     o.frequency.value = 440;
     o.connect(g);
     g.connect(this.context.destination);
@@ -78,20 +137,27 @@ class Osc {
 }
 
 class Sequence extends React.Component {
-  changeHandler = (id, value) => {
-    const newValues = {
-      gain: this.props.gain,
-      length: this.props.length
-    };
-    newValues[id] = parseFloat(value) || 0.0;
-    this.props.changeHandler(newValues);
+
+  state = {
+    length: this.props.length,
+    gain: this.props.gain,
+    rampTime: this.props.rampTime
   };
+
+  changeHandler = (id, value) => {
+    const newValue = value.replace(/[^.0-9]/, '');
+    this.setState(state => {
+      state[id] = newValue;
+      this.props.changeHandler(state);
+      return state;
+    });
+  };
+
   render() {
-    console.log(this.props)
     return (
       <div className="row mb-2 p-2 bg-info">
 
-        <div className="col-4">
+        <div className="col-3">
           <div className="input-group input-group-sm">
             <div className="input-group-prepend">
               <span className="input-group-text" id="frequency">Frequency</span>
@@ -100,27 +166,38 @@ class Sequence extends React.Component {
           </div>
         </div>
 
-        <div className="col-4">
+        <div className="col-3">
           <div className="input-group input-group-sm">
             <div className="input-group-prepend">
               <span className="input-group-text" id="gain">Gain</span>
             </div>
             <input type="text" className="form-control"
               aria-label="Small" aria-describedby="inputGroup-sizing-sm"
-              onChange={(e) => this.changeHandler('gain', e.target.value)} value={this.props.gain}
+              onChange={(e) => this.changeHandler('gain', e.target.value)} value={this.state.gain}
               />
           </div>
         </div>
 
-        <div className="col-4">
+        <div className="col-3">
           <div className="input-group input-group-sm">
             <div className="input-group-prepend">
               <span className="input-group-text" id="length">Length</span>
             </div>
-            <input onChange={(e) => this.changeHandler('length', e.target.value)} value={this.props.length}
+            <input onChange={(e) => this.changeHandler('length', e.target.value)} value={this.state.length}
              type="text" className="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm"/>
           </div>
         </div>
+
+        <div className="col-3">
+          <div className="input-group input-group-sm">
+            <div className="input-group-prepend">
+              <span className="input-group-text" id="rampTime">RampTime</span>
+            </div>
+            <input onChange={(e) => this.changeHandler('rampTime', e.target.value)} value={this.state.rampTime}
+             type="text" className="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm"/>
+          </div>
+        </div>
+
       </div>
     );
   }
@@ -130,35 +207,31 @@ export default class App extends React.Component {
 
   state = {
     value: 0,
-    sequences: [
-      {gain: dBFSToGain(-12), length: .2, rampTime: 0},
-      {gain: dBFSToGain(-16), length: .2, rampTime: 0},
-      {gain: dBFSToGain(-18), length: .2, rampTime: 0},
-      // {frequency: 440, length: 10},
-      // {frequency: 440, length: 5},
-      // {frequency: 440, length: 1}
-    ]
+    sequences: []
   };
+
   Osc = new Osc();
 
   async componentDidMount() {
-    this.Osc.registerHandler((value) => this.setState({value}))
+
+    this.Osc.registerHandler((value) => this.setState({value}));
+
+    this.Osc.pattern.registerChangeHandler((sequences) => {
+      this.setState({sequences});
+    });
+
+    const sequences = this.Osc.pattern.get();
+    if (sequences.length) this.setState({sequences});
   }
 
   play = () => {
-    this.Osc.changePattern(this.state.sequences);
-    this.Osc.toggleStart();
-  };
-
-  modSequence = (index, changes) => {
-    this.setState(state => {
-      state.sequences[index] = changes;
-      this.Osc.changePattern(state.sequences);
-      return state;
-    });
+    this.Osc.start();
   };
 
   render() {
+    const {Osc} = this;
+    const {pattern} = Osc;
+
     return (
       <div className="container pt-1">
         <div className="row p-2 mb-1">
@@ -166,7 +239,10 @@ export default class App extends React.Component {
             <button type="button" className="btn btn-primary" onClick={this.play}>Primary</button>
           </div>
         </div>
-        {this.state.sequences.map((e, i) => <Sequence key={i} changeHandler={(changes) => this.modSequence(i, changes)} {...e}/>)}
+        {this.state.sequences.map((e, i) => <Sequence key={i} changeHandler={(changes) => pattern.edit(i, changes)} {...e}/>)}
+        <div className="col-3">
+            <button type="button" className="btn btn-primary" onClick={() => pattern.add()}>Add</button>
+          </div>
       </div>
     );
   }
