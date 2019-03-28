@@ -25,10 +25,20 @@ export default class App extends React.Component {
 
     const sequences = this.sequencer.pattern.get();
     if (sequences.length) this.setState({ sequences });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.keyCode === 32) {
+        e.preventDefault();
+        (this.state.isPlaying) ? this.pause() : this.start()
+      }
+
+    })
+
+
+
   }
 
-  start = () => {    
-    console.log('here')
+  start = () => {
     this.sequencer.startSequence();
     this.setState({isPlaying: this.sequencer.isPlaying})
   };
@@ -36,7 +46,7 @@ export default class App extends React.Component {
   pause = () => {
     this.sequencer.pauseSequence();
     this.setState({isPlaying: this.sequencer.isPlaying})
-  }
+  };
 
   render() {
     const { sequencer } = this;
@@ -55,9 +65,12 @@ export default class App extends React.Component {
           <div className="col-3 text-light" id="time">{this.state.time}</div>
         </div>
         {this.state.sequences.map((e, i) => {
-          console.log(i, this.state.index);
           const light = (i === this.state.index);
-          return <Sequence key={i} light={light} changeHandler={(changes) => pattern.edit(i, changes)} {...e} />
+          return <Sequence
+            key={i} light={light}
+            changeHandler={(changes) => pattern.edit(i, changes)} {...e}
+            removeHandler={() => pattern.remove(i)}
+            />
         })}
         <div className="col-3">
           <button type="button" className="btn btn-primary" onClick={() => pattern.add()}>Add</button>

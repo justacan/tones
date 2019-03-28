@@ -3,6 +3,7 @@ import React from "react";
 export default class Sequence extends React.Component {
 
   state = {
+    frequency: this.props.frequency,
     length: this.props.length,
     gain: this.props.gain,
     rampTime: this.props.rampTime
@@ -18,8 +19,7 @@ export default class Sequence extends React.Component {
   };
 
   render() {
-    const color = (this.props.light) ? 'bg-primary' : 'bg-info'
-    console.log(color)
+    const color = (this.props.light) ? 'bg-primary' : 'bg-info';
     return (
       <div className={`row mb-2 p-2 ${color}`}>
 
@@ -28,7 +28,8 @@ export default class Sequence extends React.Component {
             <div className="input-group-prepend">
               <span className="input-group-text" id="frequency">Frequency</span>
             </div>
-            <input type="text" className="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm" />
+            <input onChange={(e) => this.changeHandler('frequency', e.target.value)} value={this.state.frequency}
+              type="text" className="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm" />
           </div>
         </div>
 
@@ -54,7 +55,7 @@ export default class Sequence extends React.Component {
           </div>
         </div>
 
-        <div className="col-3">
+        <div className="col-2">
           <div className="input-group input-group-sm">
             <div className="input-group-prepend">
               <span className="input-group-text" id="rampTime">RampTime</span>
@@ -62,6 +63,10 @@ export default class Sequence extends React.Component {
             <input onChange={(e) => this.changeHandler('rampTime', e.target.value)} value={this.state.rampTime}
               type="text" className="form-control" aria-label="Small" aria-describedby="inputGroup-sizing-sm" />
           </div>
+        </div>
+
+        <div className="col-1">
+          <button type="button" className="btn btn-danger btn-sm" onClick={this.props.removeHandler}>Remove</button>
         </div>
 
       </div>

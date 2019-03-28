@@ -22,14 +22,15 @@ export default class Sequencer {
     this.indexHandler = indexHandler;
   };
 
-  changeGain(value, rampTime) {
+  changeFrequency(value) {
+    this.o.frequency.value = value;
+  }
 
+  changeGain(value, rampTime) {
     const t = rampTime
       ? this.context.currentTime + rampTime
       : this.context.currentTime + .03;
-
     const v = parseFloat(value) || 0.01;
-
     // this.g.gain.value = v;
     this.g.gain.linearRampToValueAtTime(v, t);
     // this.g.gain.exponentialRampToValueAtTime(v, t);
@@ -56,19 +57,23 @@ export default class Sequencer {
   scheduler = () => {
     const time = this.frame / 60;
     this.timeHandler(time);
-    if (this.nextEffectTime < time) {
+    if (this.nextEffectTime < time + 0.1) {
       this.indexHandler(this.pattern.index);
       const nextEffect = this.pattern.getNext();      
+
+      let frequency = parseFloat(nextEffect.frequency);
       let gain = parseFloat(nextEffect.gain);
       let rampTime = parseFloat(nextEffect.rampTime);
       let length = parseFloat(nextEffect.length);
 
+      frequency = (!isNaN(frequency)) ? frequency : 0;
       gain = (!isNaN(gain) || gain !== 0) ? dBFSToGain(gain) : .01;
       rampTime = (!isNaN(rampTime)) ? rampTime : 0;
       length = (!isNaN(length)) ? length : 0;
 
 
       this.changeGain(gain, rampTime);
+      this.changeFrequency(frequency);
       this.nextEffectTime = time + parseFloat(length);
 
     }
@@ -82,12 +87,16 @@ export default class Sequencer {
   play() {
     const o = this.context.createOscillator();
     const g = this.context.createGain();
+    const a = this.context.createAnalyser();
     o.frequency.value = 440;
+    o.type = 'sine'
     o.connect(g);
     g.connect(this.context.destination);
+    g.connect(a);
     o.start(this.context.currentTime);
     this.o = o;
     this.g = g;
+    this.a = a;
   }
 
 }
