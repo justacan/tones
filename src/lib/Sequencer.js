@@ -49,9 +49,12 @@ export default class Sequencer {
 
   pauseSequence() {    
     this.pause = true;
-    this.isPlaying = false;    
-    this.g.gain.value = 0
-    this.o.disconnect()
+    this.isPlaying = false;
+    this.g.gain.value = 0;
+    this.o.stop(this.context.currentTime + .1);
+
+    // this.g.gain.value = 0
+    // this.o.disconnect()
   }
 
   scheduler = () => {
@@ -87,16 +90,18 @@ export default class Sequencer {
   play() {
     const o = this.context.createOscillator();
     const g = this.context.createGain();
-    const a = this.context.createAnalyser();
+
     o.frequency.value = 440;
     o.type = 'sine'
     o.connect(g);
+
     g.connect(this.context.destination);
-    g.connect(a);
+
     o.start(this.context.currentTime);
+
     this.o = o;
     this.g = g;
-    this.a = a;
+
   }
 
 }
