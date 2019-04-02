@@ -32,19 +32,21 @@ export default class Sequencer {
       : this.context.currentTime + .03;
     const v = parseFloat(value) || 0.01;
     // this.g.gain.value = v;
+
+    this.g.gain.setValueAtTime(this.g.gain.value, this.context.currentTime);
     this.g.gain.linearRampToValueAtTime(v, t);
     // this.g.gain.exponentialRampToValueAtTime(v, t);
 
   }
 
   startSequence() {
-    if (this.pause) this.pause = false        
+    if (this.pause) this.pause = false;
     if (!this.pattern.values.length || this.isPlaying) return false;
     if (!this.context) this.context = new AudioContext();
     this.isPlaying = true;
     this.pause = false;
     this.play();
-    this.scheduler();
+    // this.scheduler();
   };
 
   pauseSequence() {    
@@ -92,8 +94,9 @@ export default class Sequencer {
     const g = this.context.createGain();
 
     o.frequency.value = 440;
-    o.type = 'sine'
+    o.type = 'sine';
     o.connect(g);
+    g.gain.value = dBFSToGain(-100);
 
     g.connect(this.context.destination);
 
